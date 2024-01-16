@@ -6,14 +6,14 @@ urlcolor: blue
 ---
 
 ## PSTAT 115 (W24)
-## Assignment due on Sunday, January 29 at 11:59 pm"
+## Assignment due on Sunday, January 28 at 11:59 pm"
 
 ```{r setup, include=FALSE}
 library(knitr)
 library(testthat)
 library(tidyverse)
 library(patchwork)
-eval <- FALSE
+eval <- TRUE
 knitr::opts_chunk$set(echo=TRUE, 
                       cache=FALSE, 
                       fig.width=5, 

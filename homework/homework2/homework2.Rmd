@@ -1,14 +1,14 @@
 ---
 title: "Homework 2"
 author: "`r paste0('PSTAT 115, ', lubridate::year(Sys.Date()))`"
-date: "__Due on February 6, 2023 at 11:59 pm__"
+date: "__Due on February 11, 2024 at 11:59 pm__"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 library(knitr)
 library(testthat)
-eval <- TRUE
+eval <- FALSE
 knitr::opts_chunk$set(echo=TRUE, 
                       cache=FALSE,
                       eval = eval,
@@ -179,6 +179,17 @@ total_goals <- wwc_2019_matches$total_goals
 ```{r tags=c()}
 soccer_mle <- NULL # YOUR CODE HERE
 ```
-**3d.** You decide to stick with your original prior, the Gamma(8, 2), your friends prior or the mixture prior.  Write the posterior distribution distribution and add a vertical line at the MLE and the prior mean. Based on the plot above would you say that the prior had a large impact on conclusions or only a small one? Reference pseudo-counts and the proposed prior to argue why it makes sense that the prior did or did not have a big effect.
 
-    
+**3d.** Write the posterior distribution up to a proportionality constant by multiplying the likelihood and the combined prior density created by you and your friend. Plot this unnormalized posterior distribution and add a vertical line at the MLE computed in the previous part. _Warning:_ be very careful about what constitutes a proportionality constant in this example.    
+
+_Type your answer here, replacing this text._
+
+
+```{r tags=c()}
+# YOUR CODE HERE
+```
+
+**3e.** Based on the plot above would you say that the prior had a large impact on conclusions or only a small one? Reference pseudo-counts and the proposed prior to argue why it makes sense that the prior did or did not have a big effect.
+
+_Type your answer here, replacing this text._
+

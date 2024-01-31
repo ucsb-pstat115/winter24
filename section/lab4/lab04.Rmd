@@ -1,0 +1,118 @@
+---
+title: "Lab 4"
+author: "PSTAT 115"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+urlcolor: blue
+header-includes:
+ \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo=TRUE, 
+                      cache=FALSE, 
+                      fig.width=5, 
+                      fig.height=5,
+                      fig.align='center',
+                      fig.pos = 'H')
+library(tidyverse)
+library(ggplot2)
+```
+
+
+# Highest posterior density region (HPD) 
+
+```{r, echo=FALSE}
+include_graphics('../labs/lab4images/credible_vs_hpd.JPG')
+```
+
+# Posterior predictive distribution 
+
+- An important feature of Bayesian inference is the existence of a predictive distribution for new observations.
+  
+    + Let $\tilde y$ be a new (unseen) observation, and $y_1, ... y_n$ the observed data.
+  
+    + The Posterior predictive distribution is $p(\tilde y \mid y_1, ... y_n)$
+
+
+- The predictive distribution does not depend on unknown parameters
+
+- The predictive distribution only depends on observed data
+
+The posterior predictive distribution allows us to find the probability distribution for new data given observations of old data.
+
+$$\begin{aligned}
+p(\tilde y \mid y_1, ... y_n) &= \int p(\tilde y, \theta \mid y_1, ... y_n) d\theta\\
+&=\int p(\tilde y \mid \theta) p(\theta  \mid y_1, ... y_n) d\theta
+\end{aligned}$$
+
+- The prior predictive distribution describes our uncertainty about a new observation before seeing data
+
+- It incorporates uncertainty due to the sampling in a model $p(\tilde y \mid \theta)$ _and_ our prior uncertainty about the data generating parameter, $p(\theta)$
+
+## Example 
+
+- $\lambda \sim \text{Gamma}(\alpha, \beta)$
+
+- $\tilde Y \sim \text{Pois}(\lambda)$
+
+$$\begin{aligned}
+p(\tilde y) &= \int p(\tilde y \mid \lambda) p(\lambda) d\lambda\\
+&= \int (\frac{\lambda^{\tilde y}}{y!}e^{-\lambda})(\frac{\beta^\alpha}{\Gamma(\alpha)}\lambda^{(\alpha-1)}e^{-\beta\lambda}) d\lambda\\
+&= \frac{\beta^\alpha}{\Gamma(\alpha)y!}\int (\lambda^{(\alpha+y-1)}e^{-(\beta+1)\lambda}) d\lambda\\
+\end{aligned}$$
+
+$\int (\lambda^{(\alpha+y-1)}e^{-(\beta+1)\lambda}) d\lambda$ looks like an unormalized $\text{Gamma}(\alpha+y, \beta + 1)$
+
+
+# Sampling
+
+## Why We Need Different Sampling Strategies
+
+- In Monte Carlo methods, we sometimes need to sample from a distribution. The pdf of this distribution can be of any form as long as it is a legal pdf. 
+- For some distributions, such as normal, beta, gamma and so on, we can easily do the sampling using build in functions in R.
+- If not, we need to be more clever about how we generate samples.  There are two common approaches for sampling from a _univariate_ distribution:
+
+  + Inversion Sampling
+
+  + Rejection sampling 
+  
+## Probability Integral Transform
+
+- Suppose that a random variable, Y has a continuous distribution for with CDF is $F_Y$. 
+
+- Then the random variable $U = F_Y(Y)$ has a uniform distribution
+    - This is known as the "probability integral transform PIT"
+
+- By taking the inverse of $F_Y$ we have $F^{-1}(U) = Y$
+
+## Inversion Sampling
+
+The inverse transform sampling method works as follows:
+
+1. Generate a random number $u$ from $\text{Unif}[0,1]$
+
+2. Find the inverse of the desired CDF, e.g. $F_{Y}^{-1}(u)$.
+
+3. Compute $y = F_{Y}^{-1}(u)$. $y$ is now a sample from the desired distribution.
+
+As an example, suppose we have our CDF function given by $F_Y(y)=1-e^{-\sqrt y}$. In order to perform an inversion we want to solve for $F(F^{-1}(u))=u$.
+
+$\Rightarrow 1-e^{-\sqrt{F^{-1}(u)}}=u$
+
+$\Rightarrow F^{-1}(u)=(log(1-u))^2$
+
+And with this equation, we can generate $u$ from uniform distribution from $[0,1]$ to get our $y$. We can plot a histogram on our generated $y$ and then add the true density of $y$ to see if everything is good.
+
+```{r}
+set.seed(6666)
+n <- 10^4
+u <- runif(n)
+y <- (log(1-u))^2
+hist(y,freq=F)
+d=seq(0.01,20,0.01)
+lines(d,exp(-sqrt(d))/(2*sqrt(d)),type='l',col='red')
+```

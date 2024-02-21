@@ -1,0 +1,166 @@
+---
+title: "Lab 6"
+author: "PSTAT 115, Winter 2024"
+date: "February 21st, 2024"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+
+
+```{r, warning=FALSE, message=FALSE}
+library(coda)
+library(MASS)
+library(tidyverse)
+library(knitr)
+```
+
+# Metropolis Algorithm
+
+Put simply, the Metropolis-Hastings algorithm produces an approximate sample from the posterior by iterating between two steps:
+\begin{enumerate}
+\item Propose a new chain location by drawing from a proposal pdf
+\item Determine whether to accept the proposal. 
+\end{enumerate}
+
+To generate sample s + 1 of a Metropolis MCMC sampler given (possibly) unnormalized density $p(\theta)$ we: 
+
+1. Propose a new sample $\theta_*$ given the old sample $\theta_s$ from a symmetric distribution $J(\theta_*|\theta_s)$
+
+2. If $p(\theta_*) > p(\theta_s)$, then set $\theta_{s + 1}$ equal to $\theta_*$ and go to the next iteration
+
+3. If $p(\theta_*) < p(\theta_s)$, then
+    a. Generate a random number r from uniform(0, 1)
+    b. If $r < \frac{p(\theta_*)}{p(\theta_s)}$, set $\theta_{s + 1}$ equal to $\theta_*$ and go to the next iteration
+    c. Otherwise set $\theta_{s + 1}$ equal to $\theta_s$
+    
+Step 3. is equivalent to fliping a weighted coin, with weight $\frac{p(\theta_*)}{p(\theta_s)}$.
+    
+## Slightly different notation
+We can also define our acceptance region as 
+$$
+\alpha = \min\Big{(}1,\frac{p(\theta_*)}{p(\theta_s)} \Big{)}
+$$
+since if $p(\theta_*) > p(\theta_s)$ the probability of accepting $\theta_*$ is 100$\%$.
+
+https://chi-feng.github.io/mcmc-demo/app.html
+
+## Example
+
+Assume you are given the following code and told to use it to sample from a normal distribution
+```{r, eval = T}
+# pdf we want to sample
+p = function(theta) {
+  dnorm(theta, 1.0, 2.0)
+}
+metropolis = function(theta_s) {
+  # Function should return the next state
+  #   in the Markov chain given the current state, theta_s!
+  
+  theta_p = rnorm(1, theta_s, 1.0)
+  
+  if(p(theta_p) > p(theta_s)) {
+    return(theta_p)
+  } else {
+    r = runif(1)
+    if(r < p(theta_p) / p(theta_s)) {
+      return(theta_p)
+    } else {
+      return(theta_s)
+    }
+  }
+}
+set.seed(115)
+N = 10000
+samples = rep(0, N)
+samples[1] = 10.0
+for(i in 1:(length(samples) - 1)) {
+  samples[i + 1] = metropolis(samples[i])
+}
+```
+
+
+We can look at our traceplots, effective sample size estimates, and acf plots with the coda package:
+```{r, eval = T}
+plot(as.mcmc(samples))
+effectiveSize(samples)
+acf(samples)
+```
+Things to look out for:
+\begin{itemize}
+  \item Traceplot - 2 problems a traceplot can help us identify are high serial correlation and a long burn-in period.
+  \item ACF - large correlation at short lags and autocorrelation dying out slowly.
+\end{itemize}
+
+## Logged densities
+
+Using the un-logged densities is numerically unstable. As an example of what can happen, compare the outputs of:
+```{r, eval = T}
+print(1.0e-100 * 1e-100, format = "e", digits = 20)
+print(1.0e-200 * 1e-200, format = "e", digits = 20)
+```
+
+It is really common to need to evaluate numbers this small in a probabilistic model. For instance, a term like $0.36^{300}$ might come up when evaluating a binomial pmf that models a basketball player's yearly shooting percentage. If we extend that to maybe three years worth of shots-made, ($0.36^{900}$), we'll see that evaluates to zero.
+
+For example, computing the ratio of a normal density 1000 standard deviations from the mean to a normal density 1001 standard deviations from the mean fails because in both cases dnorm evalutes to 0 due to numerical underflow and 0/0 returns NaN.
+
+```{r}
+dnorm(1000)/dnorm(1001)
+```
+
+However, we can compute the log ratio of densities: dnorm(1000) / dnorm(1001)
+```{r}
+dnorm(1000, log=TRUE) - dnorm(1001, log=TRUE)
+```
+
+
+The trick to avoid this is working on the log scale.
+We want our metropolis algorithm to work on a log scale too. Because log is a monotonic increasing function, we can just take the log of the conditions in steps 2 and 3 above and get our new algorithm:
+
+2. If $\log p(\theta_*) > \log p(\theta_s)$, then set $\theta_{s + 1}$ equal to $\theta_*$ and go to the next iteration
+3. If $\log p(\theta_*) < \log p(\theta_s)$, then
+    a. Generate a random number r from uniform(0, 1)
+    b. If $\log(r) < \log p(\theta_*) - \log p(\theta_s)$, set $\theta_{s + 1}$ equal to $\theta_*$ and go to the next iteration
+    c. Otherwise set $\theta_{s + 1}$ equal to $\theta_s$
+
+Rewrite the code above to work on the log scale and convince yourself it is working.
+
+```{r, eval = T}
+logp = function(theta) {
+  dnorm(theta, 1.0, 2.0, log = TRUE)
+}
+metropolis = function(theta_s) {
+  theta_p = rnorm(1, theta_s, 1.0)
+  
+  if(logp(theta_p) > logp(theta_s)) {
+    return(theta_p)
+  } else {
+    r = runif(1)
+    if(log(r) < logp(theta_p) - logp(theta_s)) {
+      return(theta_p)
+    } else {
+      return(theta_s)
+    }
+  }
+}
+set.seed(115)
+N = 10000
+samples = rep(0, N)
+samples[1] = 100.0
+for(i in 1:(length(samples) - 1)) {
+  samples[i + 1] = metropolis(samples[i])
+}
+```
+
+# Introduction to STAN
+
+## A STAN file contains three program blocks: 
+
+- Data block: define the input data that will be fed into the model
+- Parameters block: define the parameters necessary for fitting the model
+- Model block: define the model to be estimated (likelihood and prior)
+
+Then after these blocks, one loads the rstan library, compiles the model, and 
+STAN fits data points that follow the log posterior density! 

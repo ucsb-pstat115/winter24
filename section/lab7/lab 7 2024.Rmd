@@ -1,0 +1,168 @@
+---
+title: "lab 7"
+date: "2024-02-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Normal Normal Conjugacy
+
+Given the typical Normal-Normal conjugacy,
+
+$$ \mu \sim \mathcal{N}(\mu_0, \frac{\sigma^2}{\kappa_0}) $$
+$$ y \sim \mathcal{N}(\mu, \sigma^2) $$
+where $\mu_0 \neq \mu$, $\sigma^2$ and $\kappa_0 > 0$ are known
+
+
+The proof of Normal-Normal conjugacy posterior can be shown to be:
+
+$$
+\mu | \mathbb{y} \sim \mathcal{N}(\frac{\mu_0\kappa_0 + \sum_i y_i}{n + \kappa_0}, \frac{\sigma^2}{n + \kappa_0})
+$$
+
+## Properties of the Posterior Mean Estimator
+
+Recall that in the case of the Normal-Normal model, the estimator of the mean $\hat{\mu}$ is 
+given by $E[\mu | \mathbb{y}] = \frac{\mu_0\kappa_0 + \sum_i y_i}{n + \kappa_0}$. We can derive some properties of this estimator.
+
+### Is this estimator biased?
+
+Recall that the $Bias(\hat{\mu}) = E[\hat{\mu}] - \mu$.
+
+
+In order to compute the bias term, we must first compute $E[\hat{\mu}] = E[E[\mu|\mathbb{y}]]$.
+$$ E[E[\mu|\mathbb{y}]] = E[\frac{\mu_0\kappa_0 + \sum_i y_i}{n + \kappa_0}] $$
+$$ E[\frac{\mu_0\kappa_0 + \sum_i y_i}{n + \kappa_0}] = \frac{\mu_0\kappa_0 + n\mu}{n + \kappa_0} $$
+Skipping some simplification, the bias can be written as $\frac{\kappa_0(\mu_0 - \mu)}{n + \kappa_0}$. Since $\mu \neq \mu$ and $\kappa_0 > 0$, the bias term does not vanish, and our estimator is biased. 
+
+Note that $\hat{\mu}_{MLE} = \bar{y}$ is unbiased, since $\bar{y} \sim \mathcal{N}(\mu, \sigma^2 /n)$,
+and $E[\bar{y}] = \mu$
+
+### What about it's variance?
+
+In the same manner as above, we can compute $Var(\hat{\mu})$. 
+$$ Var(\hat{\mu}) = Var(\frac{\mu_0\kappa_0 + \sum_i y_i}{n + \kappa_0}) = \frac{Var(\mu_0\kappa_0 + \sum_i y_i)}{(n + \kappa_0)^2}$$
+$$ = \frac{n \sigma^2}{(n + \kappa_0)^2}$$
+Note that the variance of the MLE is $\frac{n \sigma^2}{n^2}$. Since $\kappa_0 > 0$, we can see that our estimator has lower variance. 
+
+### What about MSE?
+
+The derivation for the MSE of our Bayesian estimator is quite involved. It follows from evaluating $E[(E[\mu|\mathbb{y}] - \mu)^2]$.
+It can be shown that the MSE is equal to 
+$$ MSE(\hat{\mu}) = \frac{\mu^2 \kappa_0^2}{(n + \kappa_0)^2} - 2\mu(\kappa_0^2 \mu_0) + \frac{n\sigma^2 + \mu_0\kappa_0}{(n + \kappa_0)^2} $$
+Note that the MSE depends on $\mu$ itself. This is not like $MSE(\hat{\mu}_{MLE}) = \sigma^2/n$, which is a constant with respect to $\mu$.
+
+Let's fix $\sigma = n = \kappa_0 = 1$, and $\mu_0 = 0$. Thus, the MSE of our MLE estimator = 1. 
+
+Then 
+$$ MSE(\hat{\mu}) = \frac{\mu^2}{4} + \frac{1}{4} $$ 
+
+Let's plot this parabolic function as a function of $\mu$, as well as our MLE estimator.
+
+```{r}
+mse_bayesian <- function(mu){
+  return(.25 * (mu^2 + 1))
+}
+mu <- (0:100)/10 - 5
+plot(mu, mse_bayesian(mu), type = "l")
+abline(h = 1, col = "red")
+
+```
+Thus, we can see that for some value of $\mu$ our Bayesian estimator has a lower MSE than the standard MLE estimator. 
+Explicitly, for values of $\mu \leq \frac{\sqrt{3}}{2}$, the Bayesian estimator has a lower MSE. 
+
+
+## Example
+(Ex 5.11 from Bayes Rules)
+
+Prof. Abebe and Prof. Morales both recently finished their PhDs and are teaching their first statistics classes at Bayesian University. Their colleagues told them that the average final exam score across all students, $\mu$, varies Normally from year to year with a mean of 80 points and a standard deviation of 4. Further, individual students’ scores Y vary Normally around $\mu$
+with a known standard deviation of 3 points.
+$$\mu \sim N(\theta = 80, \tau^2 = 4^2)$$
+$$Y \sim N(\mu, \sigma^2 = 3^2)$$
+\begin{enumerate}
+  \item Prof. Abebe conducts the final exam and observes that his 32 students scored an average of 86 points. Calculate the posterior mean and variance of $\mu$ using the data from Prof. Abebe’s class.
+$$
+\begin{aligned}
+p(\mu \mid y_{11},...,y_{1n_1}) &\sim N\left(\frac{\frac{1}{\tau^2}\theta + \frac{n_1}{\sigma_1^2} \bar{y_1}}{\frac{1}{\tau^2}+\frac{n_1}{\sigma_1^2}}, \frac{1}{\frac{1}{\tau^2} + \frac{n_1}{\sigma_1^2}} \right) \\
+&\sim N\left(\frac{\frac{1}{4^2}*80 + \frac{32}{3^2} * 86}{\frac{1}{4^2}+\frac{32}{3^2}}, \frac{1}{\frac{1}{4^2} + \frac{32}{3^2}} \right) \\
+&\sim N(85.8964, 0.2764)
+\end{aligned}
+$$
+  \item Prof. Morales conducts the final exam and observes that her 32 students scored an average of 82 points. Calculate the posterior mean and variance of $\mu$ using the data from Prof. Morales’ class.
+$$
+\begin{aligned}
+p(\mu \mid y_{21},...,y_{2n_2}) &\sim N\left(\frac{\frac{1}{\tau^2}\theta + \frac{n_2}{\sigma_2^2} \bar{y_2}}{\frac{1}{\tau^2}+\frac{n_2}{\sigma_2^2}}, \frac{1}{\frac{1}{\tau^2} + \frac{n_2}{\sigma_2^2}} \right) \\
+&\sim N\left(\frac{\frac{1}{4^2}*80 + \frac{32}{3^2} * 82}{\frac{1}{4^2}+\frac{32}{3^2}}, \frac{1}{\frac{1}{4^2} + \frac{32}{3^2}} \right) \\
+&\sim N(81.9655, 0.2764)
+\end{aligned}
+$$
+  \item Next, use Prof. Abebe and Prof. Morales’ combined exams to calculate the posterior mean and variance of $\mu$.
+$$
+\begin{aligned}
+p(\mu \mid y_{11},...,y_{1n_1}, y_{21},...,y_{2n_2}) &\sim N\left(\frac{\frac{1}{\tau^2}\theta + \frac{n}{\sigma^2} \bar{y}}{\frac{1}{\tau^2}+\frac{n}{\sigma^2}}, \frac{1}{\frac{1}{\tau^2} + \frac{n_1}{\sigma^2}} \right) \\
+&\sim N\left(\frac{\frac{1}{4^2}*80 + \frac{32+32}{3^2} * \frac{\sum y_1 + \sum y_2}{32+32}}{\frac{1}{4^2}+\frac{32+32}{3^2}}, \frac{1}{\frac{1}{4^2} + \frac{32+32}{3^2}} \right) \\
+&\sim N\left(\frac{\frac{1}{16}*80 + \frac{64}{9} * \frac{32\bar{y}_1 + 32\bar{y}_2}{64}}{\frac{1}{16}+\frac{64}{9}}, \frac{1}{\frac{1}{16} + \frac{64}{9}} \right) \\
+&\sim N(83.9652, 0.1394)
+\end{aligned}
+$$
+\end{enumerate}
+
+
+## Modelling with Stan 
+
+\begin{itemize}
+\item Stan is its own language used in r, python etc and need a C++ compiler. 
+\item We input our model and it calculates the log posterior density and generates samples from it.
+\item It can be confusing to learn at first and you will frequently encounter errors and bugs so don't worry too much.
+\end{itemize}
+
+A stan file needs 3 things:
+\begin{enumerate}
+\item Data: sample data and its size
+\item Parameters: What we wish to sample
+\item Model: Our likelihood and priors
+\end{enumerate}
+
+We need to specify data types such as integers or real numbers and we are also able to impose bounds using "<lower=0>". Its also important to remember to end lines of code with a semi-colon ;. We use the "check" button on our Stan file and want it to return "file.stan is syntactically correct." otherwise we have a problem in our code.
+
+## Example: Fly Wing Length
+We wish to generate samples of the length of a species of fly's wings. We are given that 
+$$y_i \sim N(\mu, \sigma^2)$$ and we assume the following priors on $\mu$ and $\sigma$ based on a previous study where we find that the average wing length is 1.9mm:
+$$\sigma \sim Cauchy(0,1) \textrm{ and } \mu \sim N(\mu_0, \frac{\sigma^2}{\kappa_0})=N(1.9, \frac{\sigma^2}{1})$$. 
+We have the following data 
+```{r}
+y = c(1.64, 1.7, 1.72, 1.74, 1.82, 1.82, 1.9, 2.08)
+n = length(y)
+```
+Now, we want to sample values of $\mu$ and $\sigma^2$:
+```{r pressure, echo=FALSE}
+# install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+# install_cmdstan()
+library(cmdstanr)
+library(bayesplot)
+```
+
+```{r}
+stan_model <- cmdstan_model("stan_example.stan")
+
+stan_fit <-
+  stan_model$sample(
+    data = list(N = n, y = y, k0=1),
+    refresh = 0, show_messages=FALSE)
+```
+We can inspect our model output in a number of ways. The first is Posterior summary statistics:
+```{r}
+stan_fit$summary()
+```
+We will also want to extract draws from our posterior:
+```{r}
+draws_df <- stan_fit$draws(format = "df")
+print(draws_df)
+```
+We can plot these draws as follows:
+```{r}
+mcmc_hist(stan_fit$draws("mu"))
+mcmc_hist(stan_fit$draws("sigma"))
+```

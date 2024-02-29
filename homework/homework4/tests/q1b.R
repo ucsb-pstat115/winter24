@@ -8,8 +8,8 @@ test = list(
       code = {
         ## TEST ##
         test_that("q2a1", {
-          expect_true(3.5 < pred_mean)
-          expect_true(pred_mean < 4.5)
+          expect_true(0.1 < prob_more_than_four)
+          expect_true(prob_more_than_four < 0.3)
         })
       }
     )

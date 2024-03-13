@@ -1,0 +1,196 @@
+---
+title: "Lab 10"
+author: "PSTAT 115, Winter 2024"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(coda)
+library(MASS)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+knitr::opts_chunk$set(echo=TRUE, 
+                      cache=FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      fig.width=5, 
+                      fig.height=5,
+                      fig.align='center',
+                      fig.pos = 'H')
+library(rstan)
+library(Rcpp)
+library(jpeg)
+```
+
+
+# Hierarchical Modeling (Eight Schools Example)
+
+The eight schools problem (Rubin 1981) considers the effectiveness of different SAT coaching programs conducted in parallel at eight schools. It has become a classic problem (Bayesian Data Analysis, Stan) that illustrates the usefulness of hierarchical modeling for sharing information between exchangeable groups.
+
+We compute the average SAT score in those who did take the program minus those who did not take part and find the average difference varies by school. What accounts for these differences?
+
+```{r}
+## data ##
+schools_dat <- list(J = 8, 
+                    y = c(28,  8, -3,  7, -1,  1, 18, 12),
+                    sigma = c(15, 10, 16, 11,  9, 11, 10, 18))
+```
+
+Our options:
+\begin{itemize}
+  \item Estimate the effect of the program in every school independently: seperate prior for ech school effect.
+  \item Assume the effect is the same in each school: combine all of the data.
+  \item A comprimise of the 2 options above?
+\end{itemize}
+
+**Model Specification:**
+
+$$\theta_j \sim N(\mu, \tau^2)$$
+$$y_j \sim N(\theta_j, \sigma_j^2)$$
+
+- $\theta_j$ are the true unknown effects of the program in school j
+
+- $y_j$ is the observed effects of the program in school j
+
+- Add a shared normal prior distribution to $\theta_j$
+
+- Assume the global mean, $\mu$ is also unknown
+
+- $\tau^2$ determines how much weight weight we put on the independent estimate vs the pooled estimate
+
+  - if $\tau^2$ is large, the prior for $\theta_j$ is not very strong: As $\tau^2 \rightarrow \inf$, equivalent to no pooling.
+  - if $\tau^2$ is small, we are assuming apriori that $\theta_j$ are all very close: As $\tau^2 \rightarrow 0$, equivalent to complete pooling model, $\theta_j = \mu$.
+
+Estimate hyperparameter $\mu$ and $\tau$ with no pooling:
+ ```{r, eval=FALSE}
+data {
+  int<lower=0> J;          // # of schools
+  array[J] real y;              // estimated treatment effects
+  array[J] real<lower=0> sigma; // standard error of effect estimates 
+}
+
+parameters {
+  real theta[J];        // school effect
+  real mu;              // mean for schools
+  real<lower=0> tau;    // variance between schools
+}
+
+model {
+  theta ~ normal(mu, tau);
+  y ~ normal(theta, sigma);
+}
+```
+
+Estimate hyperparameter $\mu$ and $\tau$ with complete pooling:
+ ```{r, eval=FALSE}
+data {
+  array[J] real y;              // estimated treatment effects
+  array[J] real<lower=0> sigma; // standard error of effect estimates 
+  real<lower=0> sigma[J];  // std err of effect
+}
+
+parameters {
+  real theta;           // school effect
+  real mu;              // mean for schools
+  real<lower=0> tau;    // variance between schools
+}
+
+model {
+  theta ~ normal(mu, tau);
+  y ~ normal(theta, sigma);
+}
+```
+
+Further, introduce $\eta$, the unscaled deviation from $\mu$ by school and let:
+$$\theta_j = \mu + \tau * \eta_j,$$
+where $\eta_j \sim N(0, 1)$
+
+Noting that $$\theta_j \mid \mu, \tau \sim N(\mu, \tau^2)$$
+
+ ```{r, eval = FALSE}
+data {
+  int<lower=0> J;         // number of schools 
+  array[J] real y;              // estimated treatment effects
+  array[J] real<lower=0> sigma; // standard error of effect estimates 
+}
+parameters {
+  real mu;                // population treatment effect
+  real<lower=0> tau;      // standard deviation in treatment effects
+  vector[J] eta;          // unscaled deviation from mu by school
+}
+transformed parameters {
+  vector[J] theta = mu + tau * eta;        // school treatment effects
+}
+model {
+  target += normal_lpdf(eta | 0, 1);       // prior log-density
+  target += normal_lpdf(y | theta, sigma); // log-likelihood
+}
+```
+
+```{r, cache = TRUE}
+library(cmdstanr)
+install_cmdstan()
+stan_model <- cmdstan_model("eight_schools.stan")
+stan_fit <- stan_model$sample(
+    data = schools_dat,
+    refresh = 0, show_messages=FALSE)
+samples <- stan_fit$draws(format = "df")
+samples
+```
+
+Is the training program effective in school j? Find $P(\theta_j>0|y)$
+```{r}
+mean(samples$`theta[1]`>0)
+mean(samples$`theta[5]`>0)
+```
+
+On avearge (over all schools) is the training program effective? Find $P(\mu>0|y)$
+```{r}
+mean(samples$mu>0)
+```
+
+
+## Shrinkage plot
+In the Bayesian estimation, shrinkage occurs as a result of hierarchical models. When parameters are modeled as exchangeable and given a proper prior, it induces some amount of shrinkage. Likewise, Bayesian models with non- or weakly-informative priors will produce similar to the MLE. But stronger priors can produce estimate much different estimtes than MLE.
+
+```{r}
+shrinkage_plot <- function(empirical, posterior_mean,
+                           shrink_point=mean(posterior_mean)) {
+  
+  tibble(y=empirical, pm=posterior_mean) %>% 
+    ggplot() + 
+    geom_segment(aes(x=y, xend=pm, y=1, yend=0), linetype="dashed") + 
+    geom_point(aes(x=y, y=1)) + 
+    geom_point(aes(x=pm, y=0)) + 
+    theme_bw(base_size=14) + 
+    geom_vline(xintercept=shrink_point, color="blue", size=1.2) + 
+    ylab("") + xlab("Estimate") + 
+    scale_y_continuous(breaks=c(0, 1), 
+                       labels=c("Posterior Mean", "MLE"), 
+                       limits=c(0,1))
+}
+```
+
+
+```{r}
+theta_post <- colMeans(samples[c(12:19)])
+print(theta_post)
+# shrinkage plot #
+shrinkage_plot(schools_dat$y, theta_post)
+```
+
+The overall average school effect, $\mu$, is also random.  Here is a histogram of the posterior distribution:
+
+```{r}
+# histogram for mu #
+mu_post = tibble(mu = samples$mu)
+ggplot(mu_post, aes(mu)) + 
+  geom_histogram() + 
+  theme_bw(base_size = 16) + 
+  labs(x = expression(mu))
+```
